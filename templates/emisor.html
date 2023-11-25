@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #f4f4f4;
+        }
+
+        #uploadForm {
+            display: flex;
+            flex-direction: column;
+            margin: 20px;
+        }
+
+        #emisorActions {
+            margin: 20px;
+        }
+
+        #tablaArchivos {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        #tablaArchivos th,
+        #tablaArchivos td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        #tablaArchivos th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        #actualizarLista {
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #008CBA;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #actualizarLista:hover {
+            background-color: #005A8D;
+        }
+
+        button {
+            padding: 8px;
+            background-color: #008CBA;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #005A8D;
+        }
+
+        #archivosSeleccionados {
+            list-style-type: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+
+        #mostrarSeleccionados {
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #008CBA;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #mostrarSeleccionados:hover {
+            background-color: #005A8D;
+        }
+
+        .preview {
+            max-width: 50px;
+            max-height: 50px;
+        }
+
+        .video-preview {
+            width: 100px;
+            height: 50px;
+        }
+    </style>
+    <title>Carga de Archivos Multimedia</title>
+</head>
+
+<body>
+    <form method="POST" action="/upload" enctype="multipart/form-data" id="uploadForm" style="display: none;">
+        <label for="archivo">Selecciona un archivo multimedia:</label>
+        <input type="file" id="archivo" name="archivo">
+        <button type="button" onclick="guardarArchivo()">Guardar</button>
+    </form>
+
+    <div id="emisorActions">
+        <table id="tablaArchivos">
+            <thead>
+                <tr>
+                    <th>Nombre de Archivo</th>
+                    <th>Seleccionar</th>
+                    <th>Enviar</th>
+                    <th>Eliminar</th>
+                    <th>Cambiar</th>
+                    <th>Previsualización</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpoTablaArchivos"></tbody>
+        </table>
+        <button id="actualizarLista" onclick="actualizarListaArchivos()">Actualizar Lista</button>
+    </div>
+
+
+    <button id="mostrarSeleccionados" onclick="mostrarArchivosSeleccionados()">Mostrar Seleccionados</button>
+    <ul id="archivosSeleccionados"></ul>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        var socket;
+
+        function mostrarArchivosSeleccionados() {
+            var archivosSeleccionados = document.getElementsByName('archivosSeleccionados');
+            var archivosSeleccionadosList = document.getElementById('archivosSeleccionados');
+            archivosSeleccionadosList.innerHTML = ''; // Limpiar la lista antes de mostrar los seleccionados
+
+            var archivosParaEnviar = [];
+
+            archivosSeleccionados.forEach(function (checkbox) {
+                if (checkbox.checked) {
+                    var listItem = document.createElement('li');
+                    listItem.textContent = checkbox.value;
+                    // Agrega el archivo a la lista para enviar al backend
+                    archivosParaEnviar.push(checkbox.value);
+                    archivosSeleccionadosList.appendChild(listItem);
+                }
+            });
+
+            // Envia la lista de archivos al backend
+            fetch('/guardar_archivos_seleccionados', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ archivos: archivosParaEnviar }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                })
+                .catch(error => {
+                    console.error('Error al enviar archivos al backend:', error);
+                });
+
+            socket.emit('upload', { 'filename': archivosParaEnviar, 'room': 'Media' });
+        }
+
+        window.onload = function () {
+            //--------------------------------------------------
+            document.getElementById('uploadForm').style.display = 'block';
+            document.getElementById('emisorActions').style.display = 'block';
+            socket = io();
+
+            var tabla = document.getElementById('tablaArchivos');
+
+            if (!tabla) {
+                // Crea la tabla y añade el encabezado
+                tabla = document.createElement('table');
+                tabla.id = 'tablaArchivos';
+
+                var thead = document.createElement('thead');
+                var encabezado = document.createElement('tr');
+                encabezado.innerHTML = '<th>Nombre de Archivo</th><th>Seleccionar</th><th>Enviar</th><th>Eliminar</th><th>Cambiar</th>';
+                thead.appendChild(encabezado);
+                tabla.appendChild(thead);
+
+                // Crea el cuerpo de la tabla
+                var tbody = document.createElement('tbody');
+                tbody.id = 'cuerpoTablaArchivos';
+                tabla.appendChild(tbody);
+
+                document.getElementById('emisorActions').appendChild(tabla);
+            } else {
+                // Limpia el cuerpo de la tabla si ya existe
+                var cuerpoTabla = document.getElementById('cuerpoTablaArchivos');
+                cuerpoTabla.innerHTML = '';
+            }
+
+            fetch('/listar_archivos')
+                .then(response => response.json())
+                .then(data => {
+                    var archivos = data['archivos'];
+                    archivos.forEach(function (archivo) {
+                        var fila = document.createElement('tr');
+
+                        var nombreArchivo = document.createElement('td');
+                        nombreArchivo.textContent = archivo;
+
+                        var checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.name = 'archivosSeleccionados';
+                        checkbox.value = archivo;
+
+                        var celdaCheckbox = document.createElement('td');
+                        celdaCheckbox.appendChild(checkbox);
+
+                        var enviarButton = document.createElement('button');
+                        enviarButton.textContent = 'Enviar';
+                        enviarButton.onclick = function () {
+                            enviarArchivo(archivo);
+                        };
+                        var celdaEnviar = document.createElement('td');
+                        celdaEnviar.appendChild(enviarButton);
+
+                        var eliminarButton = document.createElement('button');
+                        eliminarButton.textContent = 'Eliminar';
+                        eliminarButton.onclick = function () {
+                            eliminarArchivo(archivo);
+                        };
+                        var celdaEliminar = document.createElement('td');
+                        celdaEliminar.appendChild(eliminarButton);
+
+                        var cambiarButton = document.createElement('button');
+                        cambiarButton.textContent = 'Cambiar';
+                        cambiarButton.onclick = function () {
+                            cambiarArchivo(archivo);
+                        };
+                        var celdaCambiar = document.createElement('td');
+                        celdaCambiar.appendChild(cambiarButton);
+
+
+                        var previewCell = document.createElement('td');
+                        var extension = archivo.split('.').pop().toLowerCase();
+
+                        if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) {
+                            var img = document.createElement('img');
+                            img.src = `/media/${archivo}`;
+                            img.alt = 'Previsualización';
+                            img.classList.add('preview');
+                            previewCell.appendChild(img);
+                        } else if (extension === 'mp4') {
+                            // Si es un video, crea un elemento video para la previsualización
+                            var video = document.createElement('video');
+                            
+                            //video.setAttribute('autoplay', true);
+                            video.setAttribute('controls', true);
+
+                            video.src = `/media/${archivo}`;
+                            video.alt = 'Previsualización';
+                            video.classList.add('video-preview');
+                            previewCell.appendChild(video);
+                        } else {
+                            previewCell.textContent = 'No disponible';
+                        }
+
+
+                        fila.appendChild(nombreArchivo);
+                        fila.appendChild(celdaCheckbox);
+                        fila.appendChild(celdaEnviar);
+                        fila.appendChild(celdaEliminar);
+                        fila.appendChild(celdaCambiar);
+
+                        
+                        fila.appendChild(previewCell);
+
+
+                        cuerpoTabla.appendChild(fila);
+                    });
+                });
+            //--------------------------------------------------
+            // Establece el estilo del html y body para ocupar toda la pantalla
+            document.documentElement.style.margin = '0';
+            document.documentElement.style.padding = '0';
+            document.documentElement.style.height = '100%';
+            document.body.style.margin = '0';
+            document.body.style.padding = '0';
+            document.body.style.height = '100%';
+        };
+
+
+        function guardarArchivo() {
+            var fileInput = document.getElementById('archivo');
+            var formData = new FormData();
+            formData.append('archivo', fileInput.files[0]);
+
+            fetch('/upload', { method: 'POST', body: formData })
+                .then(response => response.text())
+                .then(filename => {
+                    actualizarListaArchivos();
+                });
+        }
+
+        function enviarArchivo(filename) {
+            socket.emit('upload', { 'filename': [filename], 'room': 'Media' });
+        }
+
+        function eliminarArchivo(filename) {
+            fetch(`/eliminar_archivo/${filename}`, { method: 'DELETE' })
+                .then(response => {
+                    if (response.ok) {
+                        actualizarListaArchivos();
+                    } else {
+                        console.error('Error al eliminar el archivo');
+                    }
+                });
+        }
+
+        function cambiarArchivo(filename) {
+            var fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.style.display = 'none';
+
+            fileInput.addEventListener('change', function () {
+                var formData = new FormData();
+                formData.append('archivo', fileInput.files[0]);
+
+                fetch(`/cambiar_archivo/${filename}`, { method: 'POST', body: formData })
+                    .then(response => {
+                        if (response.ok) {
+                            actualizarListaArchivos();
+                        } else {
+                            console.error('Error al cambiar el archivo');
+                        }
+                    });
+            });
+
+            fileInput.click();
+        }
+
+        function actualizarListaArchivos() {
+            var cuerpoTabla = document.getElementById('cuerpoTablaArchivos');
+            cuerpoTabla.innerHTML = '';
+
+            fetch('/listar_archivos')
+                .then(response => response.json())
+                .then(data => {
+                    var archivos = data['archivos'];
+                    archivos.forEach(function (archivo) {
+                        var fila = document.createElement('tr');
+
+                        var nombreArchivo = document.createElement('td');
+                        nombreArchivo.textContent = archivo;
+
+                        var checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.name = 'archivosSeleccionados';
+                        checkbox.value = archivo;
+
+                        var celdaCheckbox = document.createElement('td');
+                        celdaCheckbox.appendChild(checkbox);
+
+                        var enviarButton = document.createElement('button');
+                        enviarButton.textContent = 'Enviar';
+                        enviarButton.onclick = function () {
+                            enviarArchivo(archivo);
+                        };
+                        var celdaEnviar = document.createElement('td');
+                        celdaEnviar.appendChild(enviarButton);
+
+                        var eliminarButton = document.createElement('button');
+                        eliminarButton.textContent = 'Eliminar';
+                        eliminarButton.onclick = function () {
+                            eliminarArchivo(archivo);
+                        };
+                        var celdaEliminar = document.createElement('td');
+                        celdaEliminar.appendChild(eliminarButton);
+
+                        var cambiarButton = document.createElement('button');
+                        cambiarButton.textContent = 'Cambiar';
+                        cambiarButton.onclick = function () {
+                            cambiarArchivo(archivo);
+                        };
+                        var celdaCambiar = document.createElement('td');
+                        celdaCambiar.appendChild(cambiarButton);
+
+
+                        var previewCell = document.createElement('td');
+                        var extension = archivo.split('.').pop().toLowerCase();
+
+                        if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) {
+                            var img = document.createElement('img');
+                            img.src = `/media/${archivo}`;
+                            img.alt = 'Previsualización';
+                            img.classList.add('preview');
+                            previewCell.appendChild(img);
+                        } else if (extension === 'mp4') {
+                            // Si es un video, crea un elemento video para la previsualización
+                            var video = document.createElement('video');
+                            
+                            //video.setAttribute('autoplay', true);
+                            video.setAttribute('controls', true);
+
+                            video.src = `/media/${archivo}`;
+                            video.alt = 'Previsualización';
+                            video.classList.add('video-preview');
+                            previewCell.appendChild(video);
+                        } else {
+                            previewCell.textContent = 'No disponible';
+                        }
+
+
+                        fila.appendChild(nombreArchivo);
+                        fila.appendChild(celdaCheckbox);
+                        fila.appendChild(celdaEnviar);
+                        fila.appendChild(celdaEliminar);
+                        fila.appendChild(celdaCambiar);
+
+
+                        fila.appendChild(previewCell);
+
+
+                        cuerpoTabla.appendChild(fila);
+                    });
+                });
+        }
+
+
+        document.getElementById('uploadForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            fetch('/upload', { method: 'POST', body: formData })
+                .then(response => response.text())
+                .then(filename => {
+                    socket.emit('upload', { 'filename': filename, 'room': 'Media' });
+                });
+        });
+    </script>
+</body>
+
+</html>

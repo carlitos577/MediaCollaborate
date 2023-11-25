@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+
+    </style>
+    <title>Carga de Archivos Multimedia</title>
+</head>
+
+<body>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        var socket;
+        var displayedFile = null; // Variable para almacenar el archivo actualmente mostrado
+        var indiceArchivo = 0;
+        var primerArchivo;
+        // Declara una variable para controlar el estado de la pausa
+        var pausado = false;
+        var tiempoArchivo = 1000;
+        // Luego del bloque de código actualizado para el intervalo, agrega la siguiente línea
+        var intervalID = setInterval(mostrarArchivoSiguienteAutomatico, tiempoArchivo);
+
+        
+        
+
+
+        // Función para pausar o reanudar la reproducción automática
+        function togglePausa() {
+            pausado = !pausado;
+            console.log('aqui se save el valor de pausado');
+            console.log(pausado);
+            if (pausado) {
+                // Si está pausado, detiene el intervalo
+                console.log('Si está pausado, detiene el intervalo');
+                console.log(pausado);
+                clearInterval(intervalID);
+            } else {
+                // Si se reanuda, inicia el intervalo nuevamente
+                console.log('Si se reanuda, inicia el intervalo nuevamente');
+                console.log(pausado);
+                intervalID = setInterval(mostrarArchivoSiguienteAutomatico, tiempoArchivo);
+            }
+        }
+
+        window.onload = function () {
+            socket = io();
+
+            role = 'Receptor';
+            console.log('--------------------------------------------------');
+            console.log('reinica para mostrar el prmer archivo');
+            socket.emit('join', { 'username': role, 'room': 'Media' });
+            console.log('--------------------------------------------------');
+            var lista = document.getElementById('listaArchivos');
+            if (lista) {
+                lista.parentNode.removeChild(lista);
+            }
+
+            socket.on('media', function (data) {
+                filename = data['filename'];
+                console.log('--------------------------------------------------');
+                console.log('recibo y muestro el/los archivos');
+                console.log(filename);
+                console.log('muestro la cantidad de los archivos');
+                console.log(filename.length);
+
+
+                // Verifica si hay al menos un archivo en la lista
+
+                // Muestra el primer archivo en la consola
+                console.log('Muestra el primer archivo en la consola');
+                primerArchivo = filename[0];
+                console.log('Primer archivo:', primerArchivo);
+                console.log('muestro la cantidad de los archivos en el primerArchivo');
+                console.log(primerArchivo.length);
+                console.log('muestro la cantidad de los archivos en el filename');
+                console.log(filename.length)
+
+
+                // Aquí puedes realizar acciones adicionales con el primer archivo
+                // Por ejemplo, mostrarlo en la interfaz de usuario, etc.
+
+
+                // Verifica si ya se está mostrando un archivo
+                if (displayedFile !== filename) {
+                    // Actualiza el archivo actualmente mostrado
+                    displayedFile = filename;
+
+                    // Elimina el archivo anterior (si existe)
+                    var currentMedia = document.getElementById('currentMedia');
+                    if (currentMedia) {
+                        currentMedia.parentNode.removeChild(currentMedia);
+                    }
+
+                    console.log('aqui el primer archivo');
+                    console.log('lo que hay en indiceArchivo antes: ', indiceArchivo);
+                    indiceArchivo = 0;
+                    console.log('lo que hay en indiceArchivo despues: ', indiceArchivo);
+                    console.log('muestro lo que hay en primerArchivo[indiceArchivo]');
+                    console.log(primerArchivo[indiceArchivo]);
+                    console.log('--------------------------');
+                    console.log('aqui la cantidad de primerArchivo[indiceArchivo]');
+                    console.log(primerArchivo[indiceArchivo].length);
+                    console.log(primerArchivo.length);
+                    console.log('--------------------------');
+
+                    // Crea un elemento para mostrar el nuevo archivo
+                    var mediaElement;
+                    if (String.prototype.toString(primerArchivo[indiceArchivo]).endsWith('.mp3')) {
+                        mediaElement = document.createElement('audio');
+                    } else if (String(primerArchivo[indiceArchivo]).endsWith('.mp4')) {
+                        mediaElement = document.createElement('video');
+                        mediaElement.setAttribute('autoplay', true);
+                        togglePausa();
+                    } else {
+                        mediaElement = document.createElement('img');
+                        if (pausado) {
+                            togglePausa();
+                        }
+                    }
+
+                    //--------------------------------------------------------
+                    if (primerArchivo.length === 1) {
+                        togglePausa();
+
+                        if (String(primerArchivo[indiceArchivo]).endsWith('.mp4')) {
+                            mediaElement = document.createElement('video');
+                            mediaElement.setAttribute('autoplay', true);
+
+                            // Agrega un evento para detectar cuándo el video ha terminado
+                            mediaElement.addEventListener('ended', function () {
+                                // Lógica que se ejecutará cuando el video haya terminado
+                                console.log('El video ha terminado');
+
+                                // Reinicia la reproducción del video
+                                mediaElement.play();
+
+                                // Aquí puedes realizar acciones adicionales, como avanzar al siguiente archivo, etc.
+                            });
+                        }
+
+                    }
+                    //--------------------------------------------------------
+
+                    // Crea un iframe para mostrar el nuevo archivo
+                    console.log('Crea un iframe para mostrar el nuevo archivo');
+                    console.log('lo que se va mostrar en navegador');
+                    console.log('aqui el archivo a mostrar: ', primerArchivo[indiceArchivo])
+                    console.log('aqui el archivo a mostrar en que posicion de la lista: ', primerArchivo.length)
+                    var iframe = document.createElement('iframe');
+                    mediaElement.id = 'currentMedia';
+                    console.log('aqui se muestra el primerArchivo[indiceArchivo] antes');
+                    mediaElement.src = '/media/' + primerArchivo[indiceArchivo];
+                    console.log('aqui se muestra el primerArchivo[indiceArchivo] despues');
+                    mediaElement.setAttribute('controls', true);
+                    mediaElement.setAttribute('autoplay', true);
+                    mediaElement.style.width = '100%'; // Establece el ancho al 100% de la ventana
+                    mediaElement.style.height = 'calc(100% - 60px)'; // Establece la altura al 100% de la ventana
+                    mediaElement.style.objectFit = 'contain'; // Hace que la imagen se ajuste manteniendo su relación de aspecto
+                    mediaElement.style.display = 'block'; // Hace que el elemento sea de tipo bloque
+                    mediaElement.style.webkitUserSelect = 'none'; // Evita la selección de texto
+
+                    // Agrega un evento para detectar cuándo el video ha terminado
+                    mediaElement.addEventListener('ended', function () {
+                        togglePausa();
+                        // Lógica que se ejecutará cuando el video haya terminado
+                        console.log('El video ha terminado');
+                        // Aquí puedes realizar acciones adicionales, como avanzar al siguiente archivo, etc.
+                    });
+
+
+                    document.body.appendChild(mediaElement);
+
+
+                    // Ahora añade el footer
+                    var footer = document.createElement('footer');
+                    footer.id = 'mediaControls';
+                    footer.style.position = 'fixed';
+                    footer.style.bottom = '0';
+                    footer.style.width = '100%';
+                    footer.style.background = '#f0f0f0';
+                    footer.style.padding = '10px';
+                    footer.style.textAlign = 'center';
+
+                    var tiempoSpan = document.createElement('span');
+                    tiempoSpan.id = 'tiempoSpan';
+                    tiempoSpan.textContent = `${tiempoArchivo / 1000} segundos`;
+
+                    var buttonAnterior = document.createElement('button');
+                    buttonAnterior.id = 'buttonAnterior';
+                    buttonAnterior.textContent = 'Anterior';
+                    buttonAnterior.onclick = mostrarArchivoAnterior;
+
+                    var buttonSiguiente = document.createElement('button');
+                    buttonSiguiente.id = 'buttonSiguiente';
+                    buttonSiguiente.textContent = 'Siguiente';
+                    buttonSiguiente.onclick = mostrarArchivoSiguiente;
+
+                    // Añade esta línea al final del bloque donde defines el footer
+                    var buttonPausa = document.createElement('button');
+                    buttonPausa.id = 'buttonPausa';
+                    buttonPausa.textContent = 'Pausa';
+                    buttonPausa.onclick = togglePausa;
+
+                    footer.appendChild(tiempoSpan);
+
+                    footer.appendChild(buttonPausa);
+
+                    footer.appendChild(buttonAnterior);
+                    footer.appendChild(buttonSiguiente);
+
+                    document.body.appendChild(footer);
+
+
+                    console.log('--------------------------------------------------');
+                }
+
+            });
+
+
+            //--------------------------------------------------
+            // Establece el estilo del html y body para ocupar toda la pantalla
+            document.documentElement.style.margin = '0';
+            document.documentElement.style.padding = '0';
+            document.documentElement.style.height = '100%';
+            document.body.style.margin = '0';
+            document.body.style.padding = '0';
+            document.body.style.height = '100%';
+        };
+
+        // Función para mostrar el archivo anterior
+        function mostrarArchivoAnterior() {
+            if (indiceArchivo > 0) {
+                indiceArchivo--;
+                mostrarArchivo();
+            }
+        }
+
+        // Función para mostrar el archivo siguiente
+        function mostrarArchivoSiguiente() {
+            if (indiceArchivo < primerArchivo.length - 1) {
+                indiceArchivo++;
+                mostrarArchivo();
+            }
+        }
+
+        // Función para mostrar el archivo actual según el índice
+        function mostrarArchivo() {
+            if (primerArchivo.length === 1) {
+                togglePausa();
+
+                if (String(primerArchivo[indiceArchivo]).endsWith('.mp4')) {
+                    mediaElement = document.createElement('video');
+                    mediaElement.setAttribute('autoplay', true);
+
+                    // Agrega un evento para detectar cuándo el video ha terminado
+                    mediaElement.addEventListener('ended', function () {
+                        // Lógica que se ejecutará cuando el video haya terminado
+                        console.log('El video ha terminado');
+
+                        // Reinicia la reproducción del video
+                        mediaElement.play();
+
+                        // Aquí puedes realizar acciones adicionales, como avanzar al siguiente archivo, etc.
+                    });
+                }
+
+            } else {
+                // Elimina el archivo anterior (si existe)
+                var currentMedia = document.getElementById('currentMedia');
+                if (currentMedia) {
+                    currentMedia.parentNode.removeChild(currentMedia);
+                }
+
+                // Crea un elemento para mostrar el nuevo archivo
+                var mediaElement;
+                if (String(primerArchivo[indiceArchivo]).endsWith('.mp3')) {
+                    mediaElement = document.createElement('audio');
+                } else if (String(primerArchivo[indiceArchivo]).endsWith('.mp4')) {
+                    mediaElement = document.createElement('video');
+                    mediaElement.setAttribute('autoplay', true);
+                    togglePausa();
+                } else {
+                    mediaElement = document.createElement('img');
+                    if (pausado) {
+                        togglePausa();
+                    }
+                }
+
+                // Crea un iframe para mostrar el nuevo archivo
+                console.log('Crea un iframe para mostrar el nuevo archivo');
+                console.log('lo que se va mostrar en navegador');
+                console.log('aqui el archivo a mostrar: ', primerArchivo[indiceArchivo])
+                console.log('aqui el archivo a mostrar en que posicion de la lista: ', indiceArchivo);
+
+                mediaElement.id = 'currentMedia';
+                mediaElement.src = '/media/' + primerArchivo[indiceArchivo];
+                mediaElement.setAttribute('autoplay', true);
+                mediaElement.setAttribute('controls', true);
+                mediaElement.style.width = '100%'; // Establece el ancho al 100% de la ventana
+                mediaElement.style.height = 'calc(100% - 60px)'; // Establece la altura al 100% de la ventana
+                mediaElement.style.objectFit = 'contain'; // Hace que la imagen se ajuste manteniendo su relación de aspecto
+                mediaElement.style.display = 'block'; // Hace que el elemento sea de tipo bloque
+                mediaElement.style.webkitUserSelect = 'none'; // Evita la selección de texto
+
+                // Agrega un evento para detectar cuándo el video ha terminado
+                mediaElement.addEventListener('ended', function () {
+                    togglePausa();
+                    // Lógica que se ejecutará cuando el video haya terminado
+                    console.log('El video ha terminado');
+                    // Aquí puedes realizar acciones adicionales, como avanzar al siguiente archivo, etc.
+                });
+
+
+                document.body.appendChild(mediaElement);
+            }
+
+        }
+        // Función para mostrar el archivo siguiente automáticamente cada 3 segundos
+        function mostrarArchivoSiguienteAutomatico() {
+            if (indiceArchivo < primerArchivo.length - 1) {
+                indiceArchivo++;
+            } else {
+                // Si llega al último archivo, reinicia desde el principio
+                indiceArchivo = 0;
+            }
+            mostrarArchivo();
+        }
+        // Agrega esta línea al final de tu script para iniciar el intervalo
+        //setInterval(mostrarArchivoSiguienteAutomatico, 3000);
+    </script>
+
+</body>
+
+</html>
